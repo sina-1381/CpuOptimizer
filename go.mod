@@ -1,0 +1,3 @@
+module CpuOptimizer
+
+go 1.23.4
