@@ -9,28 +9,28 @@ import (
 	"time"
 )
 
-var (
+//sudo chmod 777 -R /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq
+//sudo chmod 777 -R /sys/class/drm/card1/gt_max_freq_mhz
+
+const (
 	minimumTemperture = 40
-	maximumTemperture = 70
-	minimumFrequency  = executeCommand("lscpu | awk '/min/ {print $NF}'", true)
-	maximumFrequency  = executeCommand("lscpu | awk '/max/ {print $NF}'", true)
+	maximumTemperture = 75
+)
+
+var (
+	cpuMinimumFrequency = executeCommand("lscpu | awk '/min/ {print $NF}'", true)
+	cpuMaximumFrequency = executeCommand("lscpu | awk '/max/ {print $NF}'", true)
+	gpuMinimumFrequency = executeCommand("cat /sys/class/drm/card1/gt_RP1_freq_mhz", true)
+	gpuMaximumFrequency = executeCommand("cat /sys/class/drm/card1/gt_RP0_freq_mhz", true)
 )
 
 func main() {
-	//sudo chmod 777 -R /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	for {
 		select {
 		case <-ticker.C:
 			go func() {
-				currentTemperture := executeCommand("cat /sys/class/thermal/thermal_zone0/temp", true) / 1000
-				newFrequency := calculateSafeFrequency(currentTemperture)
-				changeFrequencyCommand := fmt.Sprintf(
-					`for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq; do
-  echo %d | tee $cpu;
-done`, newFrequency)
-				_ = executeCommand(changeFrequencyCommand, false)
-				fmt.Println(newFrequency, currentTemperture)
+				applyFrequencies(getCurrentTemperture())
 			}()
 		}
 	}
@@ -53,6 +53,46 @@ func executeCommand(command string, out bool) int {
 	}
 }
 
-func calculateSafeFrequency(currentTemperture int) int {
-	return (maximumFrequency - ((maximumFrequency-minimumFrequency)/(maximumTemperture-minimumTemperture))*(currentTemperture-minimumTemperture)) * 1000
+func applyFrequencies(currentTemperture int) {
+	_ = executeCommand(cpuFrequencyCommand(calculateSafeCpuFrequency(currentTemperture)), false)
+	_ = executeCommand(gpuFrequencyCommand(calculateSafeGpuFrequency(currentTemperture)), false)
+}
+
+func getCurrentTemperture() int {
+	return executeCommand("cat /sys/class/thermal/thermal_zone0/temp", true) / 1000
+}
+
+func calculateSafeCpuFrequency(currentTemperture int) int {
+	if currentTemperture >= maximumTemperture {
+		return cpuMinimumFrequency
+	}
+
+	if currentTemperture <= minimumTemperture {
+		return cpuMaximumFrequency
+	}
+
+	return (cpuMaximumFrequency - ((cpuMaximumFrequency-cpuMinimumFrequency)/(maximumTemperture-minimumTemperture))*(currentTemperture-minimumTemperture)) * 1000
+}
+
+func calculateSafeGpuFrequency(currentTemperture int) int {
+	if currentTemperture >= maximumTemperture {
+		return gpuMinimumFrequency
+	}
+
+	if currentTemperture <= minimumTemperture {
+		return gpuMaximumFrequency
+	}
+
+	return (gpuMaximumFrequency - ((gpuMaximumFrequency-(gpuMinimumFrequency))/(maximumTemperture-minimumTemperture))*(currentTemperture-minimumTemperture))
+}
+
+func cpuFrequencyCommand(frequency int) string {
+	return fmt.Sprintf(
+		`for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq; do
+echo %d | tee $cpu;
+done`, frequency)
+}
+
+func gpuFrequencyCommand(frequency int) string {
+	return fmt.Sprintf(`echo %d | tee /sys/class/drm/card1/gt_max_freq_mhz`, frequency)
 }
