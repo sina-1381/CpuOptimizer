@@ -96,6 +96,12 @@ func gpuFrequencyCommand(frequency int) string {
 
 // sudo chmod 777 /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq /sys/class/drm/card1/gt_max_freq_mhz
 
+// sudo nano /etc/systemd/system/cpuoptimizer.service
+
+// sudo systemctl daemon-reload
+
+// sudo systemctl enable --now cpuoptimizer.service
+
 /*
 systemctl file:
 
