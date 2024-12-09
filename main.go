@@ -103,8 +103,6 @@ func gpuFrequencyCommand(frequency int) string {
 // sudo systemctl enable --now cpuoptimizer.service
 
 /*
-systemctl file:
-
 [Unit]
 Description=optimizing cpu/gpu frequency
 After=network.target
