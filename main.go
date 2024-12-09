@@ -15,9 +15,17 @@ const (
 	maximumTemperature          = 75
 	temperatureChangeThreshold  = 2
 	cpuFrequencyChangeThreshold = 40000
-	gpuFrequencyChangeThreshold = 40
+	gpuFrequencyChangeThreshold = 30
 	tickerTimeDefaultValue      = 5
 	maximumTickerTime           = 30
+)
+
+const (
+	getCpuMinimumFrequencyCommand = "lscpu | awk '/min/ {print $NF}'"
+	getCpuMaximumFrequencyCommand = "lscpu | awk '/max/ {print $NF}'"
+	getGpuMinimumFrequencyCommand = "cat /sys/class/drm/card1/gt_RP1_freq_mhz"
+	getGpuMaximumFrequencyCommand = "cat /sys/class/drm/card1/gt_RP0_freq_mhz"
+	getSystemTemperatureCommand   = "cat /sys/class/thermal/thermal_zone0/temp"
 )
 
 var err error
@@ -55,19 +63,19 @@ func main() {
 }
 
 func init() {
-	cpuMinimumFrequency, err = executeCommand("lscpu | awk '/min/ {print $NF}'", true)
+	cpuMinimumFrequency, err = executeCommand(getCpuMinimumFrequencyCommand, true)
 	if err != nil {
 		log.Printf("couldn't get system's minimum CPU frequency: %v", err)
 	}
-	cpuMaximumFrequency, err = executeCommand("lscpu | awk '/max/ {print $NF}'", true)
+	cpuMaximumFrequency, err = executeCommand(getCpuMaximumFrequencyCommand, true)
 	if err != nil {
 		log.Printf("couldnt get systems maximum cpu frequency: %v", err)
 	}
-	gpuMinimumFrequency, err = executeCommand("cat /sys/class/drm/card1/gt_RP1_freq_mhz", true)
+	gpuMinimumFrequency, err = executeCommand(getGpuMinimumFrequencyCommand, true)
 	if err != nil {
 		log.Printf("couldnt get systems minimum gpu frequency: %v", err)
 	}
-	gpuMaximumFrequency, err = executeCommand("cat /sys/class/drm/card1/gt_RP0_freq_mhz", true)
+	gpuMaximumFrequency, err = executeCommand(getGpuMaximumFrequencyCommand, true)
 	if err != nil {
 		log.Printf("couldnt get systems maximum gpu frequency: %v", err)
 	}
@@ -114,7 +122,7 @@ func applyFrequencies(currentTemperature int) {
 }
 
 func getCurrentTemperature() int {
-	temperature, err := executeCommand("cat /sys/class/thermal/thermal_zone0/temp", true)
+	temperature, err := executeCommand(getSystemTemperatureCommand, true)
 	if err != nil {
 		log.Printf("couldn't read system temperature, using default value: %v", err)
 		return defaultSafeTemperature
