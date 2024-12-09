@@ -9,9 +9,6 @@ import (
 	"time"
 )
 
-//sudo chmod 777 -R /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq
-//sudo chmod 777 -R /sys/class/drm/card1/gt_max_freq_mhz
-
 const (
 	minimumTemperture = 40
 	maximumTemperture = 75
@@ -96,3 +93,21 @@ done`, frequency)
 func gpuFrequencyCommand(frequency int) string {
 	return fmt.Sprintf(`echo %d | tee /sys/class/drm/card1/gt_max_freq_mhz`, frequency)
 }
+
+// sudo chmod 777 /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq /sys/class/drm/card1/gt_max_freq_mhz
+
+/*
+systemctl file:
+
+[Unit]
+Description=optimizing cpu/gpu frequency
+After=network.target
+
+[Service]
+ExecStartPre=/bin/bash -c ''
+ExecStart=/home/sina/go/src/CpuOptimizer/CpuOptimizer
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+*/
