@@ -10,14 +10,14 @@ import (
 )
 
 const (
-	defaultSafeTemperature      = 60
-	minimumTemperature          = 40
-	maximumTemperature          = 80
+	defaultSafeTemperature      = 55
+	minimumTemperature          = 35
+	maximumTemperature          = 75
 	temperatureChangeThreshold  = 2
-	cpuFrequencyChangeThreshold = 50000
-	gpuFrequencyChangeThreshold = 50
+	cpuFrequencyChangeThreshold = 40000
+	gpuFrequencyChangeThreshold = 40
 	tickerTimeDefaultValue      = 5
-	maximumTickerTime           = 60
+	maximumTickerTime           = 30
 )
 
 var err error
