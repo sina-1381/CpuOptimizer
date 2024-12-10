@@ -10,14 +10,12 @@ import (
 )
 
 const (
-	defaultSafeTemperature      = 55
-	minimumTemperature          = 35
-	maximumTemperature          = 75
-	temperatureChangeThreshold  = 2
-	cpuFrequencyChangeThreshold = 40000
-	gpuFrequencyChangeThreshold = 30
-	tickerTimeDefaultValue      = 5
-	maximumTickerTime           = 30
+	defaultSafeTemperature     = 55
+	minimumTemperature         = 35
+	maximumTemperature         = 75
+	temperatureChangeThreshold = 2
+	tickerTimeDefaultValue     = 5
+	maximumTickerTime          = 30
 )
 
 const (
@@ -31,14 +29,12 @@ const (
 var err error
 
 var (
-	cpuMinimumFrequency  int
-	cpuMaximumFrequency  int
-	gpuMinimumFrequency  int
-	gpuMaximumFrequency  int
-	previousTemperature  int
-	previousCpuFrequency int
-	previousGpuFrequency int
-	tickerTime           int
+	cpuMinimumFrequency int
+	cpuMaximumFrequency int
+	gpuMinimumFrequency int
+	gpuMaximumFrequency int
+	previousTemperature int
+	tickerTime          int
 )
 
 func main() {
@@ -101,23 +97,13 @@ func executeCommand(command string, out bool) (int, error) {
 }
 
 func applyFrequencies(currentTemperature int) {
-	cpuFrequency := calculateSafeCpuFrequency(currentTemperature)
-	gpuFrequency := calculateSafeGpuFrequency(currentTemperature)
-
-	if abs(cpuFrequency-previousCpuFrequency) >= cpuFrequencyChangeThreshold {
-		_, err = executeCommand(cpuFrequencyCommand(cpuFrequency), false)
-		if err != nil {
-			log.Printf("couldn't apply CPU frequency: %v", err)
-		}
-		previousCpuFrequency = cpuFrequency
+	_, err = executeCommand(cpuFrequencyCommand(calculateSafeCpuFrequency(currentTemperature)), false)
+	if err != nil {
+		log.Printf("couldn't apply CPU frequency: %v", err)
 	}
-
-	if abs(gpuFrequency-previousGpuFrequency) >= gpuFrequencyChangeThreshold {
-		_, err = executeCommand(gpuFrequencyCommand(gpuFrequency), false)
-		if err != nil {
-			log.Printf("couldn't apply GPU frequency: %v", err)
-		}
-		previousGpuFrequency = gpuFrequency
+	_, err = executeCommand(gpuFrequencyCommand(calculateSafeGpuFrequency(currentTemperature)), false)
+	if err != nil {
+		log.Printf("couldn't apply GPU frequency: %v", err)
 	}
 }
 
