@@ -10,155 +10,135 @@ import (
 )
 
 const (
-	defaultSafeTemperature     = 55
-	minimumTemperature         = 35
-	maximumTemperature         = 75
-	temperatureChangeThreshold = 2
-	tickerTimeDefaultValue     = 5
-	maximumTickerTime          = 30
+	getSystemTemperatureCommand   = "cat /sys/class/thermal/thermal_zone*/temp"
+	getGpuMinimumFrequencyCommand = "cat /sys/class/drm/card*/gt_RP1_freq_mhz"
+	getGpuMaximumFrequencyCommand = "cat /sys/class/drm/card*/gt_RP0_freq_mhz"
 )
-
-const (
-	getCpuMinimumFrequencyCommand = "lscpu | awk '/min/ {print $NF}'"
-	getCpuMaximumFrequencyCommand = "lscpu | awk '/max/ {print $NF}'"
-	getGpuMinimumFrequencyCommand = "cat /sys/class/drm/card1/gt_RP1_freq_mhz"
-	getGpuMaximumFrequencyCommand = "cat /sys/class/drm/card1/gt_RP0_freq_mhz"
-	getSystemTemperatureCommand   = "cat /sys/class/thermal/thermal_zone0/temp"
-)
-
-var err error
 
 var (
-	cpuMinimumFrequency int
-	cpuMaximumFrequency int
+	err                 error
+	preferences         map[string]map[string]any
 	gpuMinimumFrequency int
 	gpuMaximumFrequency int
-	previousTemperature int
-	tickerTime          int
 )
 
 func main() {
-	ticker := time.NewTicker(time.Duration(tickerTime) * time.Second)
+	preferences = map[string]map[string]any{
+		"power": {
+			"cpu_status": "power",
+			"gpu_freq":   gpuFrequenCal(1),
+			"min_temp":   71,
+			"max_temp":   200,
+		},
+		"balance": {
+			"cpu_status": "balance_power",
+			"gpu_freq":   gpuFrequenCal(2),
+			"min_temp":   56,
+			"max_temp":   70,
+		},
+		"performance": {
+			"cpu_status": "balance_performance",
+			"gpu_freq":   gpuFrequenCal(3),
+			"min_temp":   0,
+			"max_temp":   55,
+		},
+	}
+
+	ticker := time.NewTicker(time.Minute * 1)
 	for {
 		select {
 		case <-ticker.C:
-			currentTemperature := getCurrentTemperature()
-
-			if abs(currentTemperature-previousTemperature) >= temperatureChangeThreshold {
-				applyFrequencies(currentTemperature)
-				previousTemperature = currentTemperature
-				tickerTime = tickerTimeDefaultValue
-			} else {
-				tickerTime++
-				if tickerTime >= maximumTickerTime {
-					tickerTime = tickerTimeDefaultValue
-				}
-			}
+			currentTemp := getCurrentTemp()
+			setSettingsBasedOnTemp(currentTemp)
 		}
 	}
 }
 
 func init() {
-	cpuMinimumFrequency, err = executeCommand(getCpuMinimumFrequencyCommand, true)
-	if err != nil {
-		log.Printf("couldn't get system's minimum CPU frequency: %v", err)
-	}
-	cpuMaximumFrequency, err = executeCommand(getCpuMaximumFrequencyCommand, true)
-	if err != nil {
-		log.Printf("couldnt get systems maximum cpu frequency: %v", err)
-	}
-	gpuMinimumFrequency, err = executeCommand(getGpuMinimumFrequencyCommand, true)
+	gpuMinimumFrequency, err = executeCommand(getGpuMinimumFrequencyCommand, "info")
 	if err != nil {
 		log.Printf("couldnt get systems minimum gpu frequency: %v", err)
 	}
-	gpuMaximumFrequency, err = executeCommand(getGpuMaximumFrequencyCommand, true)
+	gpuMaximumFrequency, err = executeCommand(getGpuMaximumFrequencyCommand, "info")
 	if err != nil {
 		log.Printf("couldnt get systems maximum gpu frequency: %v", err)
 	}
-	tickerTime = tickerTimeDefaultValue
 }
 
-func executeCommand(command string, out bool) (int, error) {
+func getCurrentTemp() int {
+	temperature, err := executeCommand(getSystemTemperatureCommand, "temp")
+	if err != nil {
+		log.Printf("couldn't read system temperature, using default value: %v", err)
+	}
+	return temperature
+}
+
+func cpuPreferenceCommand(preference string) string {
+	return fmt.Sprintf(`echo %s | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference`, preference)
+}
+
+func gpuFrequencyCommand(frequency int) string {
+	return fmt.Sprintf(`echo %d | tee /sys/class/drm/card*/gt_max_freq_mhz`, frequency)
+}
+
+func gpuFrequenCal(multi int) int {
+	a := (gpuMaximumFrequency - gpuMinimumFrequency) / 3
+	return gpuMinimumFrequency + (a * multi)
+}
+
+func setSettingsBasedOnTemp(currentTemp int) {
+	var cpuStatus string
+	var gpuFreq int
+
+	for _, settings := range preferences {
+		if currentTemp >= settings["min_temp"].(int) && currentTemp <= settings["max_temp"].(int) {
+			cpuStatus = settings["cpu_status"].(string)
+			gpuFreq = settings["gpu_freq"].(int)
+		}
+	}
+	_, err = executeCommand(cpuPreferenceCommand(cpuStatus), "")
+	if err != nil {
+		log.Printf("Failed to set CPU status to '%s': %v", cpuStatus, err)
+	}
+	_, err = executeCommand(gpuFrequencyCommand(gpuFreq), "")
+	if err != nil {
+		log.Printf("Failed to set GPU frequency to '%d': %v", gpuFreq, err)
+	}
+}
+
+func executeCommand(command string, mode string) (int, error) {
 	response, err := exec.Command("sh", "-c", command).CombinedOutput()
 	if err != nil {
 		return 0, fmt.Errorf("couldn't execute command '%s': %v", command, err)
 	}
 
-	if out == true {
-		str := strings.TrimSpace(string(response))
-		output, err := strconv.ParseFloat(str, 64)
+	switch mode {
+	case "temp":
+		temps := strings.Fields(string(response))
+		var sum int
+		for _, temp := range temps {
+			num, err := strconv.Atoi(temp)
+			if err != nil {
+				return 0, fmt.Errorf("system error : '%s'", err)
+			}
+			sum += num
+		}
+		avarage := (sum / len(temps)) / 1000
+		return avarage, nil
+
+	case "info":
+		output, err := strconv.ParseFloat(strings.TrimSpace(string(response)), 64)
 		if err != nil {
 			return 0, fmt.Errorf("couldn't parse command output for '%s': %v", command, err)
 		}
 		return int(output), nil
-	}
 
-	return 0, nil
-}
-
-func applyFrequencies(currentTemperature int) {
-	_, err = executeCommand(cpuFrequencyCommand(calculateSafeCpuFrequency(currentTemperature)), false)
-	if err != nil {
-		log.Printf("couldn't apply CPU frequency: %v", err)
-	}
-	_, err = executeCommand(gpuFrequencyCommand(calculateSafeGpuFrequency(currentTemperature)), false)
-	if err != nil {
-		log.Printf("couldn't apply GPU frequency: %v", err)
+	default:
+		return 0, nil
 	}
 }
 
-func getCurrentTemperature() int {
-	temperature, err := executeCommand(getSystemTemperatureCommand, true)
-	if err != nil {
-		log.Printf("couldn't read system temperature, using default value: %v", err)
-		return defaultSafeTemperature
-	}
-	return temperature / 1000 // converting to celsius
-}
-
-func calculateSafeCpuFrequency(currentTemperature int) int {
-	if currentTemperature >= maximumTemperature {
-		return cpuMinimumFrequency
-	}
-
-	if currentTemperature <= minimumTemperature {
-		return cpuMaximumFrequency
-	}
-
-	return (cpuMaximumFrequency - ((cpuMaximumFrequency-cpuMinimumFrequency)/(maximumTemperature-minimumTemperature))*(currentTemperature-minimumTemperature)) * 1000
-}
-
-func calculateSafeGpuFrequency(currentTemperature int) int {
-	if currentTemperature >= maximumTemperature {
-		return gpuMinimumFrequency
-	}
-
-	if currentTemperature <= minimumTemperature {
-		return gpuMaximumFrequency
-	}
-
-	return (gpuMaximumFrequency - ((gpuMaximumFrequency-(gpuMinimumFrequency))/(maximumTemperature-minimumTemperature))*(currentTemperature-minimumTemperature))
-}
-
-func cpuFrequencyCommand(frequency int) string {
-	return fmt.Sprintf(
-		`for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq; do
-echo %d | tee $cpu;
-done`, frequency)
-}
-
-func gpuFrequencyCommand(frequency int) string {
-	return fmt.Sprintf(`echo %d | tee /sys/class/drm/card1/gt_max_freq_mhz`, frequency)
-}
-
-func abs(a int) int {
-	if a < 0 {
-		return -a
-	}
-	return a
-}
-
-// sudo chmod 777 /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq /sys/class/drm/card1/gt_max_freq_mhz
+// sudo chmod 777 /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference /sys/class/drm/card*/gt_max_freq_mhz
 
 // sudo nano /etc/systemd/system/cpuoptimizer.service
 
