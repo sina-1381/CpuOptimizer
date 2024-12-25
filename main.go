@@ -14,11 +14,10 @@ var (
 	preferences map[string]map[string]any
 	gpuMinFreq  int
 	gpuMaxFreq  int
-	tickerTime  int
 )
 
 func main() {
-	ticker := time.NewTicker(time.Duration(tickerTime) * time.Second)
+	ticker := time.NewTicker(30 * time.Second)
 	for {
 		select {
 		case <-ticker.C:
@@ -33,25 +32,22 @@ func init() {
 
 	preferences = map[string]map[string]any{
 		"power": {
-			"cpu_status":  "power",
-			"gpu_freq":    gpuFrequenCal(1),
-			"min_temp":    71,
-			"max_temp":    200,
-			"ticker_time": 10,
+			"cpu_status": "power",
+			"gpu_freq":   gpuFrequenCal(1),
+			"min_temp":   71,
+			"max_temp":   200,
 		},
 		"balance": {
-			"cpu_status":  "balance_power",
-			"gpu_freq":    gpuFrequenCal(2),
-			"min_temp":    60,
-			"max_temp":    70,
-			"ticker_time": 30,
+			"cpu_status": "balance_power",
+			"gpu_freq":   gpuFrequenCal(2),
+			"min_temp":   60,
+			"max_temp":   70,
 		},
 		"performance": {
-			"cpu_status":  "balance_performance",
-			"gpu_freq":    gpuFrequenCal(3),
-			"min_temp":    0,
-			"max_temp":    59,
-			"ticker_time": 60,
+			"cpu_status": "balance_performance",
+			"gpu_freq":   gpuFrequenCal(3),
+			"min_temp":   0,
+			"max_temp":   59,
 		},
 	}
 }
@@ -67,7 +63,6 @@ func setSettingsBasedOnTemp(currentTemp int) {
 		if currentTemp >= settings["min_temp"].(int) && currentTemp <= settings["max_temp"].(int) {
 			cpuStatus = settings["cpu_status"].(string)
 			gpuFreq = settings["gpu_freq"].(int)
-			tickerTime = settings["ticker_time"].(int)
 		}
 	}
 	executeCommand(applySettingsCommand(cpuStatus, gpuFreq))
