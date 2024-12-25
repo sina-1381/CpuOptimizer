@@ -14,6 +14,7 @@ var (
 	preferences map[string]map[string]any
 	gpuMinFreq  int
 	gpuMaxFreq  int
+	systemMode  string
 )
 
 func main() {
@@ -57,15 +58,17 @@ func CurrentTemp() int {
 }
 
 func setSettingsBasedOnTemp(currentTemp int) {
-	var cpuStatus string
-	var gpuFreq int
-	for _, settings := range preferences {
+	for mode, settings := range preferences {
 		if currentTemp >= settings["min_temp"].(int) && currentTemp <= settings["max_temp"].(int) {
-			cpuStatus = settings["cpu_status"].(string)
-			gpuFreq = settings["gpu_freq"].(int)
+			if systemMode != mode {
+				executeCommand(applySettingsCommand(settings["cpu_status"].(string), settings["gpu_freq"].(int)))
+				systemMode = mode
+				return
+			} else {
+				return
+			}
 		}
 	}
-	executeCommand(applySettingsCommand(cpuStatus, gpuFreq))
 }
 
 func executeCommand(command string) []byte {
