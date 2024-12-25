@@ -33,18 +33,18 @@ func main() {
 		"balance": {
 			"cpu_status": "balance_power",
 			"gpu_freq":   gpuFrequenCal(2),
-			"min_temp":   56,
+			"min_temp":   60,
 			"max_temp":   70,
 		},
 		"performance": {
 			"cpu_status": "balance_performance",
 			"gpu_freq":   gpuFrequenCal(3),
 			"min_temp":   0,
-			"max_temp":   55,
+			"max_temp":   59,
 		},
 	}
 
-	ticker := time.NewTicker(time.Minute * 1)
+	ticker := time.NewTicker(time.Second * 20)
 	for {
 		select {
 		case <-ticker.C:
@@ -73,19 +73,6 @@ func getCurrentTemp() int {
 	return temperature
 }
 
-func cpuPreferenceCommand(preference string) string {
-	return fmt.Sprintf(`echo %s | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference`, preference)
-}
-
-func gpuFrequencyCommand(frequency int) string {
-	return fmt.Sprintf(`echo %d | tee /sys/class/drm/card*/gt_max_freq_mhz`, frequency)
-}
-
-func gpuFrequenCal(multi int) int {
-	a := (gpuMaximumFrequency - gpuMinimumFrequency) / 3
-	return gpuMinimumFrequency + (a * multi)
-}
-
 func setSettingsBasedOnTemp(currentTemp int) {
 	var cpuStatus string
 	var gpuFreq int
@@ -96,13 +83,9 @@ func setSettingsBasedOnTemp(currentTemp int) {
 			gpuFreq = settings["gpu_freq"].(int)
 		}
 	}
-	_, err = executeCommand(cpuPreferenceCommand(cpuStatus), "")
+	_, err = executeCommand(applySettingsCommand(cpuStatus, gpuFreq), "")
 	if err != nil {
-		log.Printf("Failed to set CPU status to '%s': %v", cpuStatus, err)
-	}
-	_, err = executeCommand(gpuFrequencyCommand(gpuFreq), "")
-	if err != nil {
-		log.Printf("Failed to set GPU frequency to '%d': %v", gpuFreq, err)
+		log.Printf("Failed to set settings to : %v", err)
 	}
 }
 
@@ -136,6 +119,15 @@ func executeCommand(command string, mode string) (int, error) {
 	default:
 		return 0, nil
 	}
+}
+
+func applySettingsCommand(preference string, frequency int) string {
+	return fmt.Sprintf(`echo %s | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference && echo %d | tee /sys/class/drm/card*/gt_max_freq_mhz`, preference, frequency)
+}
+
+func gpuFrequenCal(multi int) int {
+	a := (gpuMaximumFrequency - gpuMinimumFrequency) / 3
+	return gpuMinimumFrequency + (a * multi)
 }
 
 // sudo chmod 777 /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference /sys/class/drm/card*/gt_max_freq_mhz
