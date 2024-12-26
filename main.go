@@ -113,23 +113,19 @@ func gpuFrequenCal(multi int) int {
 	return gpuMinFreq + (((gpuMaxFreq - gpuMinFreq) / 3) * multi)
 }
 
-// sudo chmod 777 /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference /sys/class/drm/card*/gt_max_freq_mhz
-
-// sudo nano /etc/systemd/system/cpuoptimizer.service
-
-// sudo systemctl daemon-reload
-
-// sudo systemctl enable --now cpuoptimizer.service
-
 /*
+sudo nano /etc/systemd/system/cpuoptimizer.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now cpuoptimizer.service
+
 [Unit]
 Description=optimizing cpu/gpu frequency
 After=network.target
 
 [Service]
-ExecStartPre=/bin/bash -c ''
+ExecStartPre=/bin/bash -c 'sudo chmod 777 /sys/devices/system/cpu/cpu./cpufreq/energy_performance_preference /sys/class/drm/card./gt_max_freq_mhz'
 ExecStart=/home/sina/go/src/CpuOptimizer/CpuOptimizer
-Restart=always
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
