@@ -10,7 +10,6 @@ import (
 )
 
 var (
-	err          error
 	systemMode   string
 	cpuCores     []map[string]int
 	cpuCoreCount int
@@ -116,7 +115,7 @@ func applySettingsCommand(preference string, gpuFreq, cpuFreq int) string {
 }
 
 func balanceRate(max, min int) int {
-	return (max - min) / 5
+	return (max - min) / 4
 }
 
 func average(max, min int) int {
@@ -129,22 +128,22 @@ func modesData() map[string]map[string]any {
 			"cpu_status": "power",
 			"cpu_freq":   cpuMinFreq + balanceRate(cpuMaxFreq, cpuMinFreq),
 			"gpu_freq":   gpuMinFreq + balanceRate(gpuMaxFreq, gpuMinFreq),
-			"min_temp":   71,
+			"min_temp":   66,
 			"max_temp":   200,
 		},
 		"balance": {
 			"cpu_status": "balance_power",
 			"cpu_freq":   average(cpuMaxFreq, cpuMinFreq),
 			"gpu_freq":   average(gpuMaxFreq, gpuMinFreq),
-			"min_temp":   60,
-			"max_temp":   70,
+			"min_temp":   56,
+			"max_temp":   65,
 		},
 		"performance": {
 			"cpu_status": "balance_performance",
 			"cpu_freq":   cpuMaxFreq - balanceRate(cpuMaxFreq, cpuMinFreq),
 			"gpu_freq":   gpuMaxFreq - balanceRate(gpuMaxFreq, gpuMinFreq),
 			"min_temp":   0,
-			"max_temp":   59,
+			"max_temp":   55,
 		},
 	}
 	return out
