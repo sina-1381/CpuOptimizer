@@ -115,7 +115,7 @@ func applySettingsCommand(preference string, gpuFreq, cpuFreq int) string {
 }
 
 func balanceRate(max, min int) int {
-	return (max - min) / 4
+	return (max - min) / 3
 }
 
 func average(max, min int) int {
